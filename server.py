@@ -68,7 +68,7 @@ def verify_totp(secret, token):
     totp = pyotp.TOTP(secret)
     return totp.verify(token, valid_window=1)
 
-#def send_email_otp_via_sendgrid(email, otp, otp_type="signup"):
+def send_email_otp_via_sendgrid(email, otp, otp_type="signup"):
     """
     Send OTP using SendGrid HTTP API.
     Returns True on success, False on failure.
