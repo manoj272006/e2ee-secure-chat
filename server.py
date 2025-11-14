@@ -3,7 +3,6 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import os
-import smtplib
 import random
 import pyotp
 import qrcode
@@ -15,6 +14,7 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 import secrets
 import traceback
+import requests  # required for SendGrid HTTP API
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 CORS(app)
@@ -33,15 +33,9 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# --- App config (secrets from env only) ---
-SMTP_SERVER = os.environ.get("SMTP_SERVER")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587")) if os.environ.get("SMTP_PORT") else None
-EMAIL_USER = os.environ.get("EMAIL_USER")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
-
-TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE = os.environ.get("TWILIO_PHONE")
+# --- App config (env only; no hardcoded secrets) ---
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+EMAIL_FROM = os.environ.get("EMAIL_FROM", os.environ.get("EMAIL_USER") or "no-reply@yourdomain.com")
 
 # Utility functions
 def hash_password(password):
@@ -74,78 +68,84 @@ def verify_totp(secret, token):
     totp = pyotp.TOTP(secret)
     return totp.verify(token, valid_window=1)
 
-def send_email_otp(email, otp, otp_type="signup"):
+# --- SendGrid email helper + fallback logging ---
+def send_email_otp_via_sendgrid(email, otp, otp_type="signup"):
     """
-    Send OTP via SMTP if configured. If SMTP env vars are missing or network fails,
-    fallback to logging the OTP (dev mode).
-    Returns True on success (including fallback).
+    Send OTP using SendGrid HTTP API.
+    Returns True on success, False on failure.
     """
-    try:
-        # If env not fully configured, fallback to dev logging
-        if not (SMTP_SERVER and SMTP_PORT and EMAIL_USER and EMAIL_PASSWORD):
-            print(f"[DEV-FALLBACK] Email OTP for {email}: {otp}")
-            return True
-
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = email
-
-        if otp_type == "2fa":
-            msg['Subject'] = "Your E2EE Chat Login Code (2FA)"
-            body = f"<p>Your 2FA code is: <strong>{otp}</strong></p><p>Valid 10 minutes.</p>"
-        else:
-            msg['Subject'] = "Your E2EE Chat Verification Code"
-            body = f"<p>Your signup verification code is: <strong>{otp}</strong></p><p>Valid 10 minutes.</p>"
-
-        msg.attach(MIMEText(body, 'html'))
-
-        # Try SMTP connect; catch network/unreachable errors specifically
-        try:
-            # Ensure SMTP_PORT is int
-            port = int(SMTP_PORT) if SMTP_PORT else 587
-            server = smtplib.SMTP(SMTP_SERVER, port, timeout=10)
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.send_message(msg)
-            server.quit()
-            return True
-        except (OSError, smtplib.SMTPException) as e:
-            # Network problem or SMTP handshake failed — fallback to logging
-            print("SMTP error (falling back to log):", e)
-            import traceback as _tb; _tb.print_exc()
-            print(f"[DEV-FALLBACK] Email OTP for {email}: {otp}")
-            return True
-    except Exception as e:
-        print("Unexpected error in send_email_otp:", e)
-        import traceback as _tb; _tb.print_exc()
+    if not SENDGRID_API_KEY:
+        print("[SENDGRID] No API key configured")
         return False
 
+    subject = "Your E2EE Chat Verification Code" if otp_type == "signup" else "Your E2EE Chat Login Code (2FA)"
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif;">
+        <h2>{"📧 Email Verification" if otp_type=="signup" else "🔐 Two-Factor Authentication"}</h2>
+        <p>Your verification code is:</p>
+        <h1 style="color: #667eea; letter-spacing: 5px;">{otp}</h1>
+        <p>This code will expire in 10 minutes.</p>
+      </body>
+    </html>
+    """
 
-def send_sms_otp(phone, otp, otp_type="signup"):
-    """Send OTP via Twilio. If Twilio creds not configured, logs OTP instead."""
+    payload = {
+        "personalizations": [
+            {"to": [{"email": email}], "subject": subject}
+        ],
+        "from": {"email": EMAIL_FROM},
+        "content": [{"type": "text/html", "value": html_content}]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
     try:
-        if not (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_PHONE):
-            print(f"[DEV-FALLBACK] SMS OTP for {phone}: {otp}")
+        resp = requests.post("https://api.sendgrid.com/v3/mail/send", json=payload, headers=headers, timeout=10)
+        if resp.status_code in (200, 202):
             return True
-
-        from twilio.rest import Client
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-        if otp_type == "2fa":
-            message_body = f"🔐 Your E2EE Chat login code: {otp}. Valid for 10 minutes. Don't share this code."
         else:
-            message_body = f"Your E2EE Chat verification code: {otp}. Valid for 10 minutes."
-
-        message = client.messages.create(
-            body=message_body,
-            from_=TWILIO_PHONE,
-            to=phone
-        )
-        return True
-    except Exception as e:
-        print("SMS send error:", e)
+            print("SendGrid error:", resp.status_code, resp.text)
+            return False
+    except requests.RequestException as e:
+        print("SendGrid request error:", e)
         traceback.print_exc()
         return False
+
+def send_email_otp(email, otp, otp_type="signup"):
+    """
+    Primary email sending entrypoint used by the app.
+    Tries SendGrid first; if not configured or fails, falls back to logging the OTP (dev mode).
+    Returns True if OTP was sent or logged.
+    """
+    # Try SendGrid if configured
+    if SENDGRID_API_KEY:
+        try:
+            sent = send_email_otp_via_sendgrid(email, otp, otp_type)
+            if sent:
+                return True
+            else:
+                print("[send_email_otp] SendGrid failed, falling back to log")
+        except Exception as e:
+            print("Error using SendGrid:", e)
+            traceback.print_exc()
+
+    # Final fallback: log OTP to stdout so flows continue in dev/test
+    print(f"[DEV-FALLBACK] Email OTP for {email}: {otp}")
+    return True
+
+# --- SMS helper (Twilio removed) ---
+def send_sms_otp(phone, otp, otp_type="signup"):
+    """
+    SMS sending currently not integrated with a provider (Twilio removed).
+    For now we log the OTP to stdout (dev fallback). Replace this function
+    with a real SMS provider API (e.g., Twilio, Vonage) when needed.
+    """
+    print(f"[DEV-FALLBACK] SMS OTP for {phone}: {otp}")
+    return True
 
 # --- DB Initialization ---
 def init_db():
@@ -191,7 +191,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Ensure DB exists when module is imported (so gunicorn workers see it)
+# Ensure DB exists when module is imported
 try:
     init_db()
     print(f"Initialized DB at {DB_PATH}")
@@ -202,11 +202,10 @@ except Exception as e:
 # --- Routes ---
 @app.route('/')
 def home():
-    # serve static index.html if present
     index_path = os.path.join(app.static_folder or "static", "index.html")
     if os.path.exists(index_path):
         return send_from_directory(app.static_folder, 'index.html')
-    return "🔐 E2EE Secure Chat Server Running (with 2FA: Email/SMS/TOTP)"
+    return "🔐 E2EE Secure Chat Server Running (with 2FA: Email/TOTP; SMS prints OTP)"
 
 @app.route('/request-otp', methods=['POST'])
 def request_otp():
@@ -286,7 +285,6 @@ def verify_otp():
                 c.execute("UPDATE login_sessions SET otp_verified = 1 WHERE session_id = ? AND username = ?",
                           (session_id, username))
                 conn.commit()
-            # For signup case we don't create user here; signup endpoint reads presence of this OTP record
             return jsonify({"status": "success", "message": "OTP verified"})
         else:
             return jsonify({"status": "error", "message": "Invalid OTP"}), 401
@@ -434,7 +432,8 @@ def login():
     success = False
     if two_fa_method == "email":
         success = send_email_otp(contact, otp, "2fa")
-    elif two_fa_method == "sms":
+    else:
+        # SMS method (dev fallback logs SMS)
         success = send_sms_otp(contact, otp, "2fa")
 
     if success:
@@ -635,7 +634,7 @@ def get_users():
     finally:
         conn.close()
 
-# Cleanup expired OTPs & sessions (can be called periodically if you set up a scheduler)
+# Cleanup expired OTPs & sessions
 def cleanup_expired_data():
     conn = get_db_connection()
     c = conn.cursor()
@@ -654,6 +653,5 @@ if __name__ == '__main__':
     # Local dev helper
     print(f"Starting local Flask dev server (DB at {DB_PATH})")
     port = int(os.environ.get("PORT", 8080))
-    # Init DB again for local dev (safe because CREATE TABLE IF NOT EXISTS)
     init_db()
     app.run(host="0.0.0.0", port=port, debug=True)
