@@ -75,10 +75,14 @@ def verify_totp(secret, token):
     return totp.verify(token, valid_window=1)
 
 def send_email_otp(email, otp, otp_type="signup"):
-    """Send OTP via email. If SMTP creds not configured, logs OTP instead."""
+    """
+    Send OTP via SMTP if configured. If SMTP env vars are missing or network fails,
+    fallback to logging the OTP (dev mode).
+    Returns True on success (including fallback).
+    """
     try:
+        # If env not fully configured, fallback to dev logging
         if not (SMTP_SERVER and SMTP_PORT and EMAIL_USER and EMAIL_PASSWORD):
-            # Fallback: log OTP to stdout for dev
             print(f"[DEV-FALLBACK] Email OTP for {email}: {otp}")
             return True
 
@@ -88,36 +92,34 @@ def send_email_otp(email, otp, otp_type="signup"):
 
         if otp_type == "2fa":
             msg['Subject'] = "Your E2EE Chat Login Code (2FA)"
-            body = f"""
-            <html><body style="font-family: Arial, sans-serif;">
-                <h2>🔐 Two-Factor Authentication</h2>
-                <p>Your login verification code is:</p>
-                <h1 style="color: #667eea; letter-spacing: 5px;">{otp}</h1>
-                <p>This code will expire in 10 minutes.</p>
-            </body></html>
-            """
+            body = f"<p>Your 2FA code is: <strong>{otp}</strong></p><p>Valid 10 minutes.</p>"
         else:
             msg['Subject'] = "Your E2EE Chat Verification Code"
-            body = f"""
-            <html><body style="font-family: Arial, sans-serif;">
-                <h2>📧 Email Verification</h2>
-                <p>Your verification code is:</p>
-                <h1 style="color: #667eea; letter-spacing: 5px;">{otp}</h1>
-                <p>This code will expire in 10 minutes.</p>
-            </body></html>
-            """
+            body = f"<p>Your signup verification code is: <strong>{otp}</strong></p><p>Valid 10 minutes.</p>"
+
         msg.attach(MIMEText(body, 'html'))
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
+        # Try SMTP connect; catch network/unreachable errors specifically
+        try:
+            # Ensure SMTP_PORT is int
+            port = int(SMTP_PORT) if SMTP_PORT else 587
+            server = smtplib.SMTP(SMTP_SERVER, port, timeout=10)
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASSWORD)
+            server.send_message(msg)
+            server.quit()
+            return True
+        except (OSError, smtplib.SMTPException) as e:
+            # Network problem or SMTP handshake failed — fallback to logging
+            print("SMTP error (falling back to log):", e)
+            import traceback as _tb; _tb.print_exc()
+            print(f"[DEV-FALLBACK] Email OTP for {email}: {otp}")
+            return True
     except Exception as e:
-        print("Email send error:", e)
-        traceback.print_exc()
+        print("Unexpected error in send_email_otp:", e)
+        import traceback as _tb; _tb.print_exc()
         return False
+
 
 def send_sms_otp(phone, otp, otp_type="signup"):
     """Send OTP via Twilio. If Twilio creds not configured, logs OTP instead."""
