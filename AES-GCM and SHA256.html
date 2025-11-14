@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 E2EE Secure Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .auth-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .auth-toggle button {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .auth-toggle button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .radio-option:hover {
+            border-color: #667eea;
+            background: white;
+        }
+
+        .radio-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .radio-option label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            flex: 1;
+        }
+
+        .radio-option.selected {
+            border-color: #667eea;
+            background: #e8ebff;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            color: #155724;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #17a2b8;
+            color: #0c5460;
+        }
+
+        .key-display {
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .key-display h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .key-text {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .qr-code {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .qr-code img {
+            max-width: 250px;
+            height: auto;
+        }
+
+        .chat-container {
+            display: none;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            max-width: 70%;
+            clear: both;
+        }
+
+        .message.sent {
+            float: right;
+        }
+
+        .message.received {
+            float: left;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message.sent .message-bubble {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.received .message-bubble {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        .message.received .message-time {
+            text-align: left;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: white;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .input-area button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .show {
+            display: block;
+        }
+
+        #status {
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        small {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 E2EE Secure Chat</h1>
+            <p>End-to-End Encrypted Messaging with Multiple 2FA Options</p>
+        </div>
+
+        <div id="status"></div>
+
+        <!-- Auth Screen -->
+        <div id="authScreen" class="content">
+            <div class="auth-toggle">
+                <button id="loginTab" class="active" onclick="switchTab('login')">Login</button>
+                <button id="signupTab" onclick="switchTab('signup')">Sign Up</button>
+            </div>
+
+            <div id="signupAlert" class="alert alert-warning hidden">
+                ⚠️ <strong>Important:</strong> Save your master key after signup! You'll need it to decrypt messages.
+            </div>
+
+            <div id="keyDisplay" class="key-display hidden">
+                <h4>🔑 Your Master Key (SAVE THIS!)</h4>
+                <div class="key-text" id="masterKeyDisplay"></div>
+                <button class="btn" style="margin-top: 10px;" onclick="copyMasterKey()">📋 Copy Master Key</button>
+            </div>
+
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="username" placeholder="Enter username">
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Enter password">
+            </div>
+
+            <!-- Email/Phone field (only for signup) -->
+            <div id="contactField" class="form-group hidden">
+                <label>Email or Phone Number</label>
+                <input type="text" id="contact" placeholder="Enter email or phone number">
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    Email: example@email.com | Phone: +1234567890
+                </small>
+            </div>
+
+            <!-- 2FA Toggle (only for signup) -->
+            <div id="twoFaField" class="hidden">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="enable2FA" onchange="toggle2FAOptions()">
+                    <label for="enable2FA">Enable Two-Factor Authentication (Recommended)</label>
+                </div>
+
+                <!-- 2FA Method Selection -->
+                <div id="twoFaMethodField" class="hidden">
+                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Select 2FA Method:</label>
+                    <div class="radio-group">
+                        <div class="radio-option" onclick="selectMethod('email')">
+                            <input type="radio" id="methodEmail" name="twoFaMethod" value="email">
+                            <label for="methodEmail">
+                                <strong>📧 Email OTP</strong><br>
+                                <small>Receive codes via email</small>
+                            </label>
+                        </div>
+                        <div class="radio-option" onclick="selectMethod('sms')">
+                            <input type="radio" id="methodSMS" name="twoFaMethod" value="sms">
+                            <label for="methodSMS">
+                                <strong>📱 SMS OTP</strong><br>
+                                <small>Receive codes via text message</small>
+                            </label>
+                        </div>
+                        <div class="radio-option" onclick="selectMethod('totp')">
+                            <input type="radio" id="methodTOTP" name="twoFaMethod" value="totp">
+                            <label for="methodTOTP">
+                                <strong>🔐 Google Authenticator</strong><br>
+                                <small>Use authenticator app (most secure)</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn" id="authBtn" onclick="handleAuth()">Login</button>
+        </div>
+
+        <!-- OTP Verification Screen (for signup) -->
+        <div id="otpScreen" class="content hidden">
+            <h2 style="margin-bottom: 20px;">📱 Verify OTP</h2>
+            <div class="alert alert-info">
+                Enter the 6-digit OTP sent to <strong id="otpSentTo"></strong>
+            </div>
+            
+            <div class="form-group">
+                <label>Enter OTP</label>
+                <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" maxlength="6" 
+                       style="text-align: center; font-size: 24px; letter-spacing: 8px;">
+            </div>
+
+            <button class="btn" onclick="verifyOTP()">Verify OTP</button>
+            <button class="btn btn-secondary" onclick="resendOTP()">Resend OTP</button>
+            <button class="btn btn-secondary" onclick="cancelOTP()">Cancel</button>
+        </div>
+
+        <!-- Google Authenticator Setup Screen -->
+        <div id="totpSetupScreen" class="content hidden">
+            <h2 style="margin-bottom: 20px;">🔐 Setup Google Authenticator</h2>
+            <div class="alert alert-info">
+                Scan the QR code with Google Authenticator or any TOTP app
+            </div>
+
+            <div id="qrCodeDisplay" class="qr-code">
+                <img id="qrCodeImage" src="" alt="QR Code">
+            </div>
+
+            <div class="key-display">
+                <h4>Manual Entry Key</h4>
+                <div class="key-text" id="totpSecretDisplay"></div>
+                <small style="display: block; margin-top: 10px;">
+                    If you can't scan the QR code, manually enter this key in your authenticator app
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label>Enter Code from Authenticator</label>
+                <input type="text" id="totpVerifyInput" placeholder="Enter 6-digit code" maxlength="6" 
+                       style="text-align: center; font-size: 24px; letter-spacing: 8px;">
+            </div>
+
+            <button class="btn" onclick="verifyTOTPSetup()">Verify & Continue</button>
+            <button class="btn btn-secondary" onclick="cancelTOTPSetup()">Cancel</button>
+        </div>
+
+        <!-- 2FA Verification Screen (for login) -->
+        <div id="twoFaScreen" class="content hidden">
+            <h2 style="margin-bottom: 20px;">🔐 Two-Factor Authentication</h2>
+            <div class="alert alert-info">
+                <span id="twoFaMessage">Enter your 2FA code</span>
+            </div>
+            
+            <div class="form-group">
+                <label id="twoFaLabel">Enter Code</label>
+                <input type="text" id="twoFaInput" placeholder="Enter 6-digit code" maxlength="6" 
+                       style="text-align: center; font-size: 24px; letter-spacing: 8px;">
+            </div>
+
+            <button class="btn" onclick="verify2FA()">Verify & Login</button>
+            <button class="btn btn-secondary" id="resend2FABtn" onclick="resend2FA()">Resend Code</button>
+            <button class="btn btn-secondary" onclick="cancel2FA()">Cancel</button>
+        </div>
+
+        <!-- Key Input Screen -->
+        <div id="keyInputScreen" class="content hidden">
+            <h2 style="margin-bottom: 20px;">🔑 Enter Your Master Key</h2>
+            <div class="alert alert-info">
+                Paste your master key to decrypt messages
+            </div>
+            <div class="form-group">
+                <label>Master Key</label>
+                <textarea id="masterKeyInput" placeholder="Paste your master key here..."></textarea>
+            </div>
+            <button class="btn" onclick="submitMasterKey()">Continue</button>
+            <button class="btn btn-secondary" onclick="logout()">Back to Login</button>
+        </div>
+
+        <!-- Chat Screen -->
+        <div id="chatScreen" class="content hidden">
+            <!-- Username Input -->
+            <div id="usernameInputView">
+                <div class="chat-header">
+                    <h3>Enter username to chat</h3>
+                    <button class="btn-secondary" style="padding: 8px 16px; width: auto;" onclick="logout()">Logout</button>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="chatUsername" placeholder="Enter username to chat with" onkeypress="if(event.key==='Enter') startChat()">
+                    </div>
+                    <button class="btn" onclick="startChat()">Start Chat</button>
+                </div>
+            </div>
+
+            <!-- Chat View -->
+            <div id="chatView" class="hidden">
+                <div class="chat-header">
+                    <button class="btn-secondary" style="padding: 8px 16px; width: auto;" onclick="backToUsernameInput()">← Back</button>
+                    <h3 id="chatWithUser"></h3>
+                    <button class="btn-secondary" style="padding: 8px 16px; width: auto;" onclick="loadMessages()">🔄</button>
+                </div>
+                <div class="messages" id="messages"></div>
+                <div class="input-area">
+                    <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                    <button onclick="sendMessage()">🔒 Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = window.location.origin;
+        let currentUser = '';
+        let masterKey = null;
+        let publicKeyHash = null;
+        let selectedUser = '';
+        let authMode = 'login';
+        let pendingSignupData = null;
+        let twoFaSessionId = null;
+        let twoFaUsername = null;
+        let totpSecret = null;
+        let selected2FAMethod = null;
+
+        setStatus('Ready');
+
+        function setStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        function switchTab(mode) {
+            authMode = mode;
+            document.getElementById('loginTab').classList.toggle('active', mode === 'login');
+            document.getElementById('signupTab').classList.toggle('active', mode === 'signup');
+            document.getElementById('authBtn').textContent = mode === 'login' ? 'Login' : 'Sign Up';
+            document.getElementById('signupAlert').classList.toggle('hidden', mode === 'login');
+            document.getElementById('contactField').classList.toggle('hidden', mode === 'login');
+            document.getElementById('twoFaField').classList.toggle('hidden', mode === 'login');
+            document.getElementById('keyDisplay').classList.add('hidden');
+            document.getElementById('twoFaMethodField').classList.add('hidden');
+            document.getElementById('enable2FA').checked = false;
+        }
+
+        function toggle2FAOptions() {
+            const enabled = document.getElementById('enable2FA').checked;
+            document.getElementById('twoFaMethodField').classList.toggle('hidden', !enabled);
+        }
+
+        function selectMethod(method) {
+            selected2FAMethod = method;
+            document.getElementById('methodEmail').checked = (method === 'email');
+            document.getElementById('methodSMS').checked = (method === 'sms');
+            document.getElementById('methodTOTP').checked = (method === 'totp');
+            
+            // Update UI
+            document.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('selected'));
+            if (method === 'email') document.querySelector('.radio-option:nth-child(1)').classList.add('selected');
+            if (method === 'sms') document.querySelector('.radio-option:nth-child(2)').classList.add('selected');
+            if (method === 'totp') document.querySelector('.radio-option:nth-child(3)').classList.add('selected');
+        }
+
+        async function generateMasterKey() {
+            setStatus('Generating master key...');
+            try {
+                const keyArray = new Uint8Array(32);
+                window.crypto.getRandomValues(keyArray);
+                
+                const masterKeyB64 = btoa(String.fromCharCode(...keyArray));
+                
+                const encoder = new TextEncoder();
+                const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(masterKeyB64));
+                const publicKeyHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+                
+                document.getElementById('masterKeyDisplay').textContent = masterKeyB64;
+                document.getElementById('keyDisplay').classList.remove('hidden');
+                
+                setStatus('Master key generated successfully');
+                return { masterKey: masterKeyB64, publicKeyHash };
+            } catch (error) {
+                setStatus('Error generating key');
+                alert('Error generating key: ' + error.message);
+                throw error;
+            }
+        }
+
+        function copyMasterKey() {
+            const keyText = document.getElementById('masterKeyDisplay').textContent;
+            navigator.clipboard.writeText(keyText);
+            alert('Master key copied! Save it somewhere safe.');
+        }
+
+        async function handleAuth() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            if (authMode === 'signup') {
+                const contact = document.getElementById('contact').value.trim();
+                
+                if (!contact) {
+                    alert('Please enter your email or phone number');
+                    return;
+                }
+
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+                
+                if (!emailRegex.test(contact) && !phoneRegex.test(contact)) {
+                    alert('Please enter a valid email or phone number\nEmail: example@email.com\nPhone: +1234567890');
+                    return;
+                }
+
+                const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/;
+                if (!passwordRegex.test(password)) {
+                    alert('Password must contain:\n• At least 8 characters\n• One uppercase letter\n• One lowercase letter\n• One special character');
+                    return;
+                }
+
+                const enable2FA = document.getElementById('enable2FA').checked;
+                
+                if (enable2FA && !selected2FAMethod) {
+                    alert('Please select a 2FA method');
+                    return;
+                }
+
+                setStatus('Generating keys...');
+                const keys = await generateMasterKey();
+
+                pendingSignupData = {
+                    username,
+                    password,
+                    contact,
+                    publicKeyHash: keys.publicKeyHash,
+                    enable2FA,
+                    twoFaMethod: selected2FAMethod
+                };
+
+                // If TOTP selected, setup Google Authenticator first
+                if (enable2FA && selected2FAMethod === 'totp') {
+                    await setupTOTP(username);
+                    return;
+                }
+
+                // Otherwise, send OTP
+                try {
+                    const response = await fetch(`${BASE_URL}/request-otp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, contact })
+                    });
+
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        document.getElementById('authScreen').classList.add('hidden');
+                        document.getElementById('otpScreen').classList.remove('hidden');
+                        document.getElementById('otpSentTo').textContent = contact;
+                        setStatus('OTP sent successfully');
+                    } else {
+                        alert('Error: ' + data.message);
+                        setStatus('OTP request failed');
+                        pendingSignupData = null;
+                    }
+                } catch (error) {
+                    alert('Network error: ' + error.message);
+                    setStatus('Network error');
+                    pendingSignupData = null;
+                }
+            } else {
+                // Login
+                setStatus('Logging in...');
+                try {
+                    const response = await fetch(`${BASE_URL}/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        if (data.two_fa_required) {
+                            twoFaSessionId = data.session_id;
+                            twoFaUsername = username;
+                            const method = data.two_fa_method;
+                            
+                            document.getElementById('authScreen').classList.add('hidden');
+                            document.getElementById('twoFaScreen').classList.remove('hidden');
+                            
+                            if (method === 'totp') {
+                                document.getElementById('twoFaMessage').textContent = 'Enter code from Google Authenticator';
+                                document.getElementById('twoFaLabel').textContent = 'Authenticator Code';
+                                document.getElementById('resend2FABtn').classList.add('hidden');
+                            } else if (method === 'email') {
+                                document.getElementById('twoFaMessage').textContent = 'Enter the code sent to ' + data.contact;
+                                document.getElementById('twoFaLabel').textContent = 'Email Code';
+                                document.getElementById('resend2FABtn').classList.remove('hidden');
+                            } else if (method === 'sms') {
+                                document.getElementById('twoFaMessage').textContent = 'Enter the code sent to ' + data.contact;
+                                document.getElementById('twoFaLabel').textContent = 'SMS Code';
+                                document.getElementById('resend2FABtn').classList.remove('hidden');
+                            }
+                            
+                            setStatus('2FA required');
+                        } else {
+                            currentUser = username;
+                            document.getElementById('authScreen').classList.add('hidden');
+                            document.getElementById('keyInputScreen').classList.remove('hidden');
+                            setStatus('Login successful - Enter your master key');
+                        }
+                    } else {
+                        alert('Error: ' + data.message);
+                        setStatus('Login failed');
+                    }
+                } catch (error) {
+                    alert('Network error: ' + error.message);
+                    setStatus('Network error');
+                }
+            }
+        }
+
+        async function setupTOTP(username) {
+            setStatus('Setting up Google Authenticator...');
+            try {
+                const response = await fetch(`${BASE_URL}/setup-totp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    totpSecret = data.secret;
+                    document.getElementById('qrCodeImage').src = 'data:image/png;base64,' + data.qr_code;
+                    document.getElementById('totpSecretDisplay').textContent = data.manual_entry;
+                    
+                    document.getElementById('authScreen').classList.add('hidden');
+                    document.getElementById('totpSetupScreen').classList.remove('hidden');
+                    setStatus('Scan QR code with Google Authenticator');
+                } else {
+                    alert('Error setting up TOTP: ' + data.message);
+                    pendingSignupData = null;
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+                pendingSignupData = null;
+            }
+        }
+
+        async function verifyTOTPSetup() {
+            const code = document.getElementById('totpVerifyInput').value.trim();
+            
+            if (!code || code.length !== 6) {
+                alert('Please enter a valid 6-digit code');
+                return;
+            }
+
+            setStatus('Verifying TOTP code...');
+            
+            // For signup, we need to send OTP after TOTP setup
+            try {
+                const response = await fetch(`${BASE_URL}/request-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: pendingSignupData.username,
+                        contact: pendingSignupData.contact
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    pendingSignupData.totpSecret = totpSecret;
+                    document.getElementById('totpSetupScreen').classList.add('hidden');
+                    document.getElementById('otpScreen').classList.remove('hidden');
+                    document.getElementById('otpSentTo').textContent = pendingSignupData.contact;
+                    setStatus('TOTP setup complete - Verify signup OTP');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        function cancelTOTPSetup() {
+            totpSecret = null;
+            pendingSignupData = null;
+            document.getElementById('totpSetupScreen').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('totpVerifyInput').value = '';
+            setStatus('Setup cancelled');
+        }
+
+        async function verify2FA() {
+            const code = document.getElementById('twoFaInput').value.trim();
+            
+            if (!code || code.length !== 6) {
+                alert('Please enter a valid 6-digit code');
+                return;
+            }
+
+            if (!twoFaSessionId || !twoFaUsername) {
+                alert('No pending login found');
+                return;
+            }
+
+            setStatus('Verifying 2FA code...');
+            try {
+                const response = await fetch(`${BASE_URL}/verify-2fa-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: twoFaSessionId,
+                        username: twoFaUsername,
+                        code: code
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    currentUser = twoFaUsername;
+                    document.getElementById('twoFaScreen').classList.add('hidden');
+                    document.getElementById('keyInputScreen').classList.remove('hidden');
+                    document.getElementById('twoFaInput').value = '';
+                    twoFaSessionId = null;
+                    twoFaUsername = null;
+                    setStatus('Login successful - Enter your master key');
+                } else {
+                    alert('Error: ' + data.message);
+                    setStatus('2FA verification failed');
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+                setStatus('Network error');
+            }
+        }
+
+        async function resend2FA() {
+            if (!twoFaUsername) {
+                alert('No pending login found');
+                return;
+            }
+
+            setStatus('Resending 2FA code...');
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        username: twoFaUsername, 
+                        password: password 
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success' && data.two_fa_required) {
+                    twoFaSessionId = data.session_id;
+                    alert('2FA code resent successfully!');
+                    setStatus('2FA code resent');
+                    document.getElementById('twoFaInput').value = '';
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to resend code'));
+                    setStatus('Resend failed');
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+                setStatus('Network error');
+            }
+        }
+
+        function cancel2FA() {
+            twoFaSessionId = null;
+            twoFaUsername = null;
+            document.getElementById('twoFaScreen').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('twoFaInput').value = '';
+            setStatus('Login cancelled');
+        }
+
+        async function submitMasterKey() {
+            const keyInput = document.getElementById('masterKeyInput').value.trim();
+            if (!keyInput) {
+                alert('Please enter your master key');
+                return;
+            }
+
+            try {
+                const keyArray = Uint8Array.from(atob(keyInput), c => c.charCodeAt(0));
+                if (keyArray.length !== 32) {
+                    throw new Error('Invalid key length');
+                }
+                
+                masterKey = keyInput;
+                
+                const encoder = new TextEncoder();
+                const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(masterKey));
+                publicKeyHash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+                
+                document.getElementById('keyInputScreen').classList.add('hidden');
+                document.getElementById('chatScreen').classList.remove('hidden');
+                setStatus('Ready to chat');
+            } catch (error) {
+                alert('Invalid master key format: ' + error.message);
+            }
+        }
+
+        async function startChat() {
+            const username = document.getElementById('chatUsername').value.trim();
+            
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+            
+            if (username === currentUser) {
+                alert('You cannot chat with yourself');
+                return;
+            }
+            
+            setStatus('Checking user...');
+            try {
+                const response = await fetch(`${BASE_URL}/public-key/${username}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    selectedUser = username;
+                    document.getElementById('usernameInputView').classList.add('hidden');
+                    document.getElementById('chatView').classList.remove('hidden');
+                    document.getElementById('chatWithUser').textContent = `Chat with ${username}`;
+                    loadMessages();
+                } else {
+                    alert('User not found: ' + username);
+                    setStatus('User not found');
+                }
+            } catch (error) {
+                alert('Error checking user: ' + error.message);
+                setStatus('Error checking user');
+            }
+        }
+
+        function backToUsernameInput() {
+            selectedUser = '';
+            document.getElementById('chatView').classList.add('hidden');
+            document.getElementById('usernameInputView').classList.remove('hidden');
+            document.getElementById('chatUsername').value = '';
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+
+            setStatus('Sending encrypted message...');
+            try {
+                const keyResponse = await fetch(`${BASE_URL}/public-key/${selectedUser}`);
+                const keyData = await keyResponse.json();
+
+                if (keyData.status !== 'success') {
+                    alert('Could not get receiver public key');
+                    return;
+                }
+
+                const encrypted = await encryptMessage(message, keyData.public_key);
+
+                const response = await fetch(`${BASE_URL}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender: currentUser,
+                        receiver: selectedUser,
+                        encrypted_message: encrypted
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    messageInput.value = '';
+                    loadMessages();
+                    setStatus('Message sent');
+                } else {
+                    alert('Error: ' + data.message);
+                    setStatus('Send failed');
+                }
+            } catch (error) {
+                alert('Error sending message: ' + error.message);
+                setStatus('Send error');
+            }
+        }
+
+        async function loadMessages() {
+            if (!selectedUser) return;
+
+            setStatus('Loading messages...');
+            try {
+                const response = await fetch(`${BASE_URL}/messages?user1=${currentUser}&user2=${selectedUser}`);
+                const data = await response.json();
+
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+
+                for (const msg of data.messages) {
+                    let decryptedText = msg.encrypted_message;
+
+                    if (msg.receiver === currentUser) {
+                        try {
+                            decryptedText = await decryptMessage(msg.encrypted_message, masterKey);
+                        } catch (error) {
+                            decryptedText = '[Decryption failed]';
+                        }
+                    } else {
+                        decryptedText = '[Encrypted message]';
+                    }
+
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = msg.sender === currentUser ? 'message sent' : 'message received';
+                    messageDiv.innerHTML = `
+                        <div class="message-bubble">${decryptedText}</div>
+                        <div class="message-time">${msg.sender} • ${msg.timestamp}</div>
+                    `;
+                    messagesDiv.appendChild(messageDiv);
+                }
+
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                setStatus(`${data.messages.length} messages loaded`);
+            } catch (error) {
+                setStatus('Error loading messages');
+            }
+        }
+
+        async function encryptMessage(message, receiverPublicKeyHash) {
+            try {
+                const encoder = new TextEncoder();
+                const keyMaterial = await window.crypto.subtle.importKey(
+                    'raw',
+                    Uint8Array.from(atob(receiverPublicKeyHash), c => c.charCodeAt(0)),
+                    { name: 'PBKDF2' },
+                    false,
+                    ['deriveKey']
+                );
+
+                const aesKey = await window.crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: encoder.encode('e2ee-chat-salt'),
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt']
+                );
+
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                
+                const encoded = encoder.encode(message);
+                const encrypted = await window.crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    aesKey,
+                    encoded
+                );
+
+                const combined = new Uint8Array(iv.length + encrypted.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encrypted), iv.length);
+
+                return btoa(String.fromCharCode(...combined));
+            } catch (error) {
+                console.error('Encryption error:', error);
+                throw error;
+            }
+        }
+
+        async function decryptMessage(encryptedMessage, userMasterKey) {
+            try {
+                const combined = Uint8Array.from(atob(encryptedMessage), c => c.charCodeAt(0));
+                
+                const iv = combined.slice(0, 12);
+                const encrypted = combined.slice(12);
+
+                const encoder = new TextEncoder();
+                const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(userMasterKey));
+                const userPublicKeyHash = new Uint8Array(hashBuffer);
+
+                const keyMaterial = await window.crypto.subtle.importKey(
+                    'raw',
+                    userPublicKeyHash,
+                    { name: 'PBKDF2' },
+                    false,
+                    ['deriveKey']
+                );
+
+                const aesKey = await window.crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: encoder.encode('e2ee-chat-salt'),
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['decrypt']
+                );
+
+                const decrypted = await window.crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    aesKey,
+                    encrypted
+                );
+
+                return new TextDecoder().decode(decrypted);
+            } catch (error) {
+                console.error('Decryption error:', error);
+                throw error;
+            }
+        }
+
+        function logout() {
+            currentUser = '';
+            masterKey = null;
+            publicKeyHash = null;
+            selectedUser = '';
+            pendingSignupData = null;
+            twoFaSessionId = null;
+            twoFaUsername = null;
+            totpSecret = null;
+            selected2FAMethod = null;
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('keyInputScreen').classList.add('hidden');
+            document.getElementById('chatScreen').classList.add('hidden');
+            document.getElementById('otpScreen').classList.add('hidden');
+            document.getElementById('twoFaScreen').classList.add('hidden');
+            document.getElementById('totpSetupScreen').classList.add('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('contact').value = '';
+            document.getElementById('masterKeyInput').value = '';
+            document.getElementById('otpInput').value = '';
+            document.getElementById('twoFaInput').value = '';
+            document.getElementById('totpVerifyInput').value = '';
+            document.getElementById('chatUsername').value = '';
+            setStatus('Logged out');
+        }
+
+        async function verifyOTP() {
+            const otp = document.getElementById('otpInput').value.trim();
+            
+            if (!otp || otp.length !== 6) {
+                alert('Please enter a valid 6-digit OTP');
+                return;
+            }
+
+            if (!pendingSignupData) {
+                alert('No pending signup found');
+                return;
+            }
+
+            setStatus('Verifying OTP...');
+            try {
+                const response = await fetch(`${BASE_URL}/verify-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: pendingSignupData.username,
+                        otp: otp
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    await completeSignup();
+                } else {
+                    alert('Error: ' + data.message);
+                    setStatus('OTP verification failed');
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+                setStatus('Network error');
+            }
+        }
+
+        async function completeSignup() {
+            setStatus('Creating account...');
+            try {
+                const signupPayload = {
+                    username: pendingSignupData.username,
+                    password: pendingSignupData.password,
+                    contact: pendingSignupData.contact,
+                    public_key: pendingSignupData.publicKeyHash,
+                    enable_2fa: pendingSignupData.enable2FA
+                };
+
+                if (pendingSignupData.enable2FA) {
+                    signupPayload.two_fa_method = pendingSignupData.twoFaMethod;
+                    if (pendingSignupData.twoFaMethod === 'totp') {
+                        signupPayload.totp_secret = pendingSignupData.totpSecret;
+                    }
+                }
+
+                const response = await fetch(`${BASE_URL}/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(signupPayload)
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    let message = '✅ Account created successfully!';
+                    if (data.two_fa_enabled) {
+                        const methodName = data.two_fa_method === 'totp' ? 'Google Authenticator' : 
+                                         data.two_fa_method === 'email' ? 'Email OTP' : 'SMS OTP';
+                        message += `\n2FA enabled with ${methodName}`;
+                    }
+                    message += '\n\nYour master key is displayed. SAVE IT NOW!';
+                    alert(message);
+                    
+                    document.getElementById('otpScreen').classList.add('hidden');
+                    document.getElementById('authScreen').classList.remove('hidden');
+                    document.getElementById('keyDisplay').classList.remove('hidden');
+                    pendingSignupData = null;
+                    totpSecret = null;
+                    setStatus('Account created successfully');
+                } else {
+                    alert('Error: ' + data.message);
+                    setStatus('Signup failed');
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+                setStatus('Network error');
+            }
+        }
+
+        async function resendOTP() {
+            if (!pendingSignupData) {
+                alert('No pending signup found');
+                return;
+            }
+
+            setStatus('Resending OTP...');
+            try {
+                const response = await fetch(`${BASE_URL}/request-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: pendingSignupData.username,
+                        contact: pendingSignupData.contact
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    alert('OTP resent successfully!');
+                    setStatus('OTP resent');
+                    document.getElementById('otpInput').value = '';
+                } else {
+                    alert('Error: ' + data.message);
+                    setStatus('Resend failed');
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+                setStatus('Network error');
+            }
+        }
+
+        function cancelOTP() {
+            pendingSignupData = null;
+            totpSecret = null;
+            document.getElementById('otpScreen').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('otpInput').value = '';
+            setStatus('Signup cancelled');
+        }
+
+        // Auto-refresh messages every 5 seconds when in chat
+        setInterval(() => {
+            if (selectedUser && document.getElementById('chatView').classList.contains('hidden') === false) {
+                loadMessages();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

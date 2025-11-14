@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: e2ee-secure-chat
+    env: python
+    region: oregon
+    repo: <your-git-repo-url>
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 3 --threads 2
