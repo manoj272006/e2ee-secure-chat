@@ -68,11 +68,11 @@ def verify_totp(secret, token):
     totp = pyotp.TOTP(secret)
     return totp.verify(token, valid_window=1)
 
-# --- SendGrid email helper + fallback logging ---
-def send_email_otp_via_sendgrid(email, otp, otp_type="signup"):
+#def send_email_otp_via_sendgrid(email, otp, otp_type="signup"):
     """
     Send OTP using SendGrid HTTP API.
     Returns True on success, False on failure.
+    Logs response for debugging.
     """
     if not SENDGRID_API_KEY:
         print("[SENDGRID] No API key configured")
@@ -104,15 +104,24 @@ def send_email_otp_via_sendgrid(email, otp, otp_type="signup"):
     }
 
     try:
-        resp = requests.post("https://api.sendgrid.com/v3/mail/send", json=payload, headers=headers, timeout=10)
+        resp = requests.post("https://api.sendgrid.com/v3/mail/send", json=payload, headers=headers, timeout=15)
+        # ALWAYS log the response for debugging
+        print(f"[SENDGRID] request to /v3/mail/send returned status={resp.status_code}")
+        # resp.text may be empty on 202; log headers for extra info
+        print("[SENDGRID] response headers:", dict(resp.headers))
+        body_text = resp.text.strip()
+        if body_text:
+            print("[SENDGRID] response body:", body_text)
+
         if resp.status_code in (200, 202):
+            print(f"[SENDGRID] Email accepted for delivery to {email} (status {resp.status_code})")
             return True
         else:
-            print("SendGrid error:", resp.status_code, resp.text)
+            print(f"[SENDGRID] Send failed: {resp.status_code} {resp.text}")
             return False
     except requests.RequestException as e:
-        print("SendGrid request error:", e)
-        traceback.print_exc()
+        print("SendGrid request exception:", repr(e))
+        import traceback as _tb; _tb.print_exc()
         return False
 
 def send_email_otp(email, otp, otp_type="signup"):
